@@ -1,0 +1,22 @@
+int a = 10;
+int b = 20;
+int c = 0;
+
+func add {
+    int c = a + b;
+    ret;
+}
+
+func increment {
+    while (a < b) {
+        a = a + 1;
+    }
+    ret;
+}
+
+call add;
+call increment;
+
+while (c < 30) {
+    c = c + 1;
+}
