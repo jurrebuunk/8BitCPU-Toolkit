@@ -254,6 +254,22 @@ class ALU:
         print(f"\nNumber Display: {self.number_display} (Signed Mode: {self.signed_mode})")
         print(f"PC: {self.pc} | Flags: {self.flags}")
 
+    def print_memory_grid(self):
+        print("RAM (256 bytes):")
+        # Print header
+        header = "     " + " ".join(f"{i:02X}" for i in range(16))
+        print(header)
+        for row in range(16):
+            row_str = f"{row*16:02X}: "
+            row_str += " ".join(f"{self.memory[row*16 + col]:02X}" for col in range(16))
+            print(row_str)
+        print()
+        # Compact register and state info
+        reg_str = "Registers: " + " ".join(f"R{i:02}:{self.registers[i]:02X}" for i in range(16))
+        print(reg_str)
+        print(f"Number Display: {self.number_display} (Signed Mode: {self.signed_mode})")
+        print(f"PC: {self.pc} | Flags: {self.flags}")
+
 
 
 def main():
@@ -278,7 +294,8 @@ def main():
         pc = 0  # Program counter
         while pc < len(program) and not alu.halted:
             alu.screen.flash_clock_light()  # Flash the clock light
-            alu.print_full_state()
+            #alu.print_full_state()
+            alu.print_memory_grid()
             opcode, operand1, operand2, operand3 = program[pc]
             next_pc = alu.execute(opcode, operand1, operand2, operand3)
             if next_pc is not None:
@@ -292,7 +309,9 @@ def main():
             elif alu.clock_speed > 0:
                 time.sleep(1 / alu.clock_speed)
 
-        alu.print_full_state()
+        #alu.print_full_state()
+        alu.print_memory_grid()
+
 
     # Run the ALU execution in a separate thread
     alu_thread = threading.Thread(target=run_alu)

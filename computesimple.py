@@ -148,6 +148,22 @@ class ALU:
 
         print(f"\nNumber Display: {self.number_display} (Signed Mode: {self.signed_mode})")
         print(f"PC: {self.pc} | Flags: {self.flags}")
+    
+    def print_memory_grid(self):
+        print("RAM (256 bytes):")
+        # Print header
+        header = "     " + " ".join(f"{i:02X}" for i in range(16))
+        print(header)
+        for row in range(16):
+            row_str = f"{row*16:02X}: "
+            row_str += " ".join(f"{self.memory[row*16 + col]:02X}" for col in range(16))
+            print(row_str)
+        print()
+        # Compact register and state info
+        reg_str = "Registers: " + " ".join(f"R{i:02}:{self.registers[i]:02X}" for i in range(16))
+        print(reg_str)
+        print(f"Number Display: {self.number_display} (Signed Mode: {self.signed_mode})")
+        print(f"PC: {self.pc} | Flags: {self.flags}")
 
 def main():
     parser = argparse.ArgumentParser(description="Simple 8-bit ALU Emulator")
@@ -171,7 +187,8 @@ def main():
             else:
                 pc += 1
             alu.pc = pc
-        alu.print_full_state()
+        #alu.print_full_state()
+        alu.print_memory_grid()
 
 if __name__ == "__main__":
     main()
