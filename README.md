@@ -1,6 +1,8 @@
 # 8-Bit CPU Assembler Project
 
-This project contains tools and programs for assembling and simulating code for a custom 8-bit CPU architecture. It includes multiple Python scripts for assembling source files, performing computations, and running tests, as well as a collection of example programs.
+This project contains tools and programs for assembling and simulating code for a custom 8-bit CPU architecture. It includes multiple Python scripts for assembling source files, performing computations, and running tests, as well as a collection of example programs. 
+
+Project website: [8BitCPU-Toolkit](https://jurrebuunk.github.io/8BitCPU-Toolkit/)
 
 ## Project Structure
 
