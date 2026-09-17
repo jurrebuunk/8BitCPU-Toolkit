@@ -1,6 +1,6 @@
 # 8BitCPU Toolkit
 
-[![Pre-release](https://img.shields.io/github/v/release/jurrebuunk/8BitCPU-Toolkit?include_prereleases&label=pre-release)](https://github.com/jurrebuunk/8BitCPU-Toolkit/releases)
+[![Release](https://img.shields.io/github/v/release/jurrebuunk/8BitCPU-Toolkit?label=release)](https://github.com/jurrebuunk/8BitCPU-Toolkit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/)
 
@@ -8,7 +8,7 @@
 
 Project website: [jurrebuunk.github.io/8BitCPU-Toolkit](https://jurrebuunk.github.io/8BitCPU-Toolkit/)
 
-> Status: **alpha / pre-release**. The toolkit is usable for experimentation, but the CLI, instruction behavior, and Jutcode compiler are still evolving.
+> Status: **v1.0**. The CPU core, assembler, examples, and tests are stable enough for learning/experimentation. Experimental Jutcode work is kept separately under `experimental/jutcode/`.
 >
 > See [ROADMAP.md](ROADMAP.md) for the current test findings, limitations, and recommended next fixes.
 
@@ -19,8 +19,8 @@ Project website: [jurrebuunk.github.io/8BitCPU-Toolkit](https://jurrebuunk.githu
 - Inspect RAM, registers, program counter, flags, and number display state while programs run.
 - Use labels, jumps, branches, calls, and returns in assembly programs.
 - Experiment with memory-mapped screen output through a 32x32 black-and-white Tkinter display.
-- Explore an early high-level **Jutcode** syntax and compiler prototype.
 - Learn from included sample programs in `programs/`.
+- Explore archived/experimental ideas under `archive/` and `experimental/` without mixing them into the core CPU toolkit.
 
 ## Requirements
 
@@ -101,13 +101,14 @@ python compute.py programs/multiplication.mc --clock 2
 
 | File | Purpose |
 | --- | --- |
-| `assemblerasm.py` | Assembles `.asm` source files into `.mc` machine-code files. |
-| `assemblerjc.py` | Experimental Jutcode lexer/parser/code generator prototype. |
+| `assemblerasm.py` | Assembles `.asm` source files into `.mc` and `.bin` machine-code files. |
 | `cpu.py` | Reliable headless CPU core and command-line runner. |
 | `compute.py` | Graphical emulator using the shared CPU core with Tkinter display, clock controls, and step mode. |
-| `test.py` | Tkinter color screen/buffer experiment. |
+| `docs/architecture.md` | CPU architecture, instruction encoding, flags, stack, and assembler reference. |
 | `tests/` | Unit tests for the assembler and CPU core. |
-| `programs/` | Example `.asm`, `.mc`, and `.jc` programs. |
+| `programs/` | Example `.asm`, `.mc`, and `.bin` programs. |
+| `experimental/jutcode/` | Early Jutcode compiler prototype, not part of the core v1.0 flow. |
+| `archive/legacy/` | Old notes and experiments kept for history. |
 
 ## Assembly Example
 
@@ -205,32 +206,24 @@ See `programs/line.asm` for a simple drawing example.
 | `programs/square.asm` | Square calculation example. |
 | `programs/line.asm` | Draws pixels using memory-mapped screen addresses. |
 | `programs/turing.asm` | Turing-machine-style example. |
-| `programs/mult.jc` | Example Jutcode source. |
+| `programs/fib.asm` | Fibonacci example that stops on 8-bit overflow. |
 
-## Jutcode Status
+## Experimental Jutcode
 
-`assemblerjc.py` is an early prototype for a small high-level language that can generate assembly-like output. It currently demonstrates lexing, parsing, and code generation from an embedded example program.
-
-Planned improvements include:
-
-- Reading `.jc` files from the command line.
-- Writing generated assembly or machine code to output files.
-- Expanding control-flow and comparison support.
-- Adding tests for the lexer, parser, and code generator.
+The early Jutcode prototype has been moved to `experimental/jutcode/` so the main repo stays focused on the CPU core and assembler. It is not part of the v1.0 core workflow yet.
 
 ## Project Structure
 
 ```text
 .
 ├── assemblerasm.py              # Assembly assembler
-├── assemblerjc.py               # Experimental Jutcode compiler prototype
 ├── cpu.py                       # Headless CPU core and CLI runner
 ├── compute.py                   # Graphical emulator with Tkinter display
 ├── docs/architecture.md         # CPU architecture reference
-├── test.py                      # Screen/color buffer experiment
 ├── tests/                       # Unit tests
 ├── programs/                    # Example source and machine-code programs
-├── Jutcode documentation.docx   # Jutcode notes/documentation
+├── experimental/jutcode/        # Experimental Jutcode prototype
+├── archive/legacy/              # Old notes and experiments
 ├── CHANGELOG.md                 # Release history
 ├── LICENSE                      # MIT license
 └── README.md                    # Project overview
@@ -238,9 +231,7 @@ Planned improvements include:
 
 ## Known Limitations
 
-- This is an alpha release, so behavior may change.
-- The Jutcode compiler is experimental and not yet a full file-based CLI tool.
-- Some older example programs still need cleanup and clearer expected-output comments.
+- Jutcode is experimental and not yet part of the core workflow.
 - The graphical emulator requires a working Tkinter display environment.
 - There is no packaged `pip` install flow yet.
 
@@ -255,10 +246,9 @@ python -m unittest discover -s tests -v
 - Expand automated tests for more example programs and edge cases.
 - Turn the tools into cleaner command-line interfaces.
 - Add packaging via `pyproject.toml`.
-- Improve Jutcode file input/output.
-- Expand CPU architecture documentation.
-- Convert the Jutcode documentation to Markdown.
 - Add more example programs and screenshots/GIFs.
+- Add a denser binary instruction encoding later if desired.
+- Improve or remove the experimental Jutcode prototype.
 
 ## Contributing
 

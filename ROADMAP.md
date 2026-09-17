@@ -13,7 +13,7 @@ Tested on 2026-09-17 after the first CPU-core cleanup:
 - `ADD`, `SUB`, `BRH Z`, `BRH C`, `CAL`, `RET`, memory-mapped I/O, and machine-code loading have unit tests.
 - All `.asm` programs in `programs/` assemble successfully with `assemblerasm.py`.
 - `programs/multiplication.asm` now starts with main code before the subroutine, avoiding the old stack-underflow behavior.
-- `assemblerjc.py` still uses an embedded demo program instead of reading the provided `.jc` file argument.
+- The old Jutcode prototype has been moved to `experimental/jutcode/`; it still uses an embedded demo program instead of reading the provided `.jc` file argument.
 - Added `docs/architecture.md` with the current CPU model, instruction encoding, flags, stack, memory-mapped I/O, and assembler directives.
 - Added binary `.bin` machine-code output alongside the human-readable `.mc` format.
 - Added `MOV`, `PUSH`, and `POP` instructions.
@@ -162,7 +162,7 @@ Still to improve:
 
 Current state:
 
-- `assemblerjc.py` does not read `programs/mult.jc` from the command line.
+- `experimental/jutcode/assemblerjc.py` does not read `experimental/jutcode/mult.jc` from the command line.
 - It prints debug tokens and generated instructions from an embedded string.
 
 Suggested fix:
