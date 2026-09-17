@@ -24,8 +24,8 @@ Project website: [8BitCPU-Toolkit](https://jurrebuunk.github.io/8BitCPU-Toolkit/
 2. Install Python 3.x if not already installed.
 3. Run the assembler scripts to convert assembly or Jutcode files to machine code:
    ```powershell
-   python assemblerasm.py programs/example.asm
-   python assemblerjc.py programs/example.jc
+   python assemblerasm.py programs/multiplication.asm
+   python assemblerjc.py programs/mult.jc
    ```
 4. Use `compute.py` or `computesimple.py` to simulate or analyze machine code files.
 
@@ -52,8 +52,8 @@ Refer to `Jutcode documentation.docx` for details on the Jutcode format and CPU 
 
 ## License
 
-Specify your license here (e.g., MIT, GPL, etc.).
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Author
 
-Your Name
+Jurre Buunk
