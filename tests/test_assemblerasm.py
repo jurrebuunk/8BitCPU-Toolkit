@@ -28,8 +28,49 @@ class AssemblerAsmTest(unittest.TestCase):
         )
 
     def test_unknown_branch_condition_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "Unknown branch condition"):
+        with self.assertRaisesRegex(ValueError, "unknown branch condition"):
             assemble("BRH MAYBE, 0")
+
+    def test_branch_alias_and_mov(self):
+        self.assertEqual(
+            assemble("MOV R2, R1\nBZ done\nNOP\ndone: HLT"),
+            [
+                (0x10, 2, 1, None),
+                (0b1011, 0, 3, None),
+                (0b0000, None, None, None),
+                (0b0001, None, None, None),
+            ],
+        )
+
+    def test_constants_data_labels_and_org(self):
+        source = """
+.equ SCREEN_NUMBER, 250
+.data
+.org 32
+answer: .byte 42
+.text
+.org 2
+LDI R0, answer
+STR R0, R15, SCREEN_NUMBER
+"""
+        from assemblerasm import assemble_program
+
+        program = assemble_program(source)
+
+        self.assertEqual(program.memory_image, {32: 42})
+        self.assertEqual(
+            program.instructions,
+            [
+                (0b0000, None, None, None),
+                (0b0000, None, None, None),
+                (0b1000, 0, 32, None),
+                (0b1111, 0, 15, 250),
+            ],
+        )
+
+    def test_strict_register_validation(self):
+        with self.assertRaisesRegex(ValueError, "Expected register"):
+            assemble("ADD R1, 5, R2")
 
 
 if __name__ == "__main__":

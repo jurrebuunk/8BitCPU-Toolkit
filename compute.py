@@ -1,9 +1,10 @@
 import argparse
 import time
 import tkinter as tk
+from pathlib import Path
 from tkinter import messagebox
 
-from cpu import CPU, CPUFault, load_program
+from cpu import CPU, CPUFault, load_memory_image, load_program
 
 
 class Screen:
@@ -88,7 +89,8 @@ class Screen:
 
 def main():
     parser = argparse.ArgumentParser(description="Graphical 8-bit CPU emulator")
-    parser.add_argument("input_file", help="Machine-code `.mc` file to run")
+    parser.add_argument("input_file", help="Machine-code `.mc` or binary `.bin` file to run")
+    parser.add_argument("--memory", help="Optional memory image file. Defaults to matching .mem if present")
     parser.add_argument("--step", action="store_true", help="Enable step mode for debugging")
     parser.add_argument("--clock", type=int, default=0, help="Clock speed in Hz (0 for unlimited)")
     parser.add_argument("--trace", action="store_true", help="Print CPU state before every instruction")
@@ -102,7 +104,10 @@ def main():
     screen = Screen(root)
     screen.update_clock_speed(args.clock)
     cpu = CPU(screen=screen)
-    program = load_program(args.input_file)
+    input_path = Path(args.input_file)
+    memory_path = Path(args.memory) if args.memory else input_path.with_suffix(".mem")
+    cpu.load_memory_image(load_memory_image(memory_path))
+    program = load_program(input_path)
     steps = 0
 
     def on_closing():

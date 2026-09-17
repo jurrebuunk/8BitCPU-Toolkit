@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cpu import CPU, CPUFault, load_program
+from cpu import CPU, CPUFault, load_program, write_binary_program, load_binary_program
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -95,8 +95,9 @@ class CPUTest(unittest.TestCase):
         self.assertEqual(cpu.registers[3], 0)
         self.assertEqual(cpu.pc, 10)
 
-    def test_call_and_return(self):
+    def test_call_and_return_uses_ram_backed_stack(self):
         cpu = CPU()
+        start_sp = cpu.sp
         program = [
             (0b1000, 0, 1, None),      # R0 = 1
             (0b1100, 4, None, None),   # call add_two
@@ -110,6 +111,25 @@ class CPUTest(unittest.TestCase):
 
         self.assertTrue(cpu.halted)
         self.assertEqual(cpu.registers[0], 3)
+        self.assertEqual(cpu.stack, [])
+        self.assertEqual(cpu.sp, start_sp)
+        self.assertEqual(cpu.memory[start_sp], 2)
+
+    def test_mov_push_and_pop(self):
+        cpu = CPU()
+        program = [
+            (0b1000, 0, 123, None),
+            (0x10, 1, 0, None),
+            (0x11, 1, None, None),
+            (0b1000, 1, 0, None),
+            (0x12, 2, None, None),
+            (0b0001, None, None, None),
+        ]
+
+        cpu.run(program)
+
+        self.assertEqual(cpu.registers[1], 0)
+        self.assertEqual(cpu.registers[2], 123)
         self.assertEqual(cpu.stack, [])
 
     def test_return_without_call_is_fault(self):
@@ -148,6 +168,18 @@ class CPUTest(unittest.TestCase):
 
         self.assertEqual(program, [(0b1000, 0, 42, None), (0b0001, None, None, None)])
 
+    def test_binary_machine_code_round_trip(self):
+        program = [(0b1000, 0, 42, None), (0x10, 1, 0, None), (0b0001, None, None, None)]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "program.bin"
+            write_binary_program(path, program)
+
+            loaded = load_binary_program(path)
+            loaded_via_auto = load_program(path)
+
+        self.assertEqual(loaded, program)
+        self.assertEqual(loaded_via_auto, program)
+
     def test_programs_test_mc_halts(self):
         cpu = CPU()
         program = load_program(REPO_ROOT / "programs" / "test.mc")
@@ -167,6 +199,23 @@ class CPUTest(unittest.TestCase):
         self.assertTrue(cpu.halted)
         self.assertEqual(cpu.registers[2], 28)
         self.assertEqual(cpu.number_display, 28)
+
+    def test_programs_div_mc_halts_with_expected_result(self):
+        cpu = CPU()
+        program = load_program(REPO_ROOT / "programs" / "div.mc")
+
+        cpu.run(program, max_steps=1000)
+
+        self.assertTrue(cpu.halted)
+        self.assertEqual(cpu.registers[3], 5)
+        self.assertEqual(cpu.number_display, 5)
+
+    def test_all_example_machine_code_programs_halt(self):
+        for path in sorted((REPO_ROOT / "programs").glob("*.mc")):
+            with self.subTest(program=path.name):
+                cpu = CPU()
+                cpu.run(load_program(path), max_steps=1000)
+                self.assertTrue(cpu.halted)
 
 
 if __name__ == "__main__":

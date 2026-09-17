@@ -14,6 +14,10 @@ Tested on 2026-09-17 after the first CPU-core cleanup:
 - All `.asm` programs in `programs/` assemble successfully with `assemblerasm.py`.
 - `programs/multiplication.asm` now starts with main code before the subroutine, avoiding the old stack-underflow behavior.
 - `assemblerjc.py` still uses an embedded demo program instead of reading the provided `.jc` file argument.
+- Added `docs/architecture.md` with the current CPU model, instruction encoding, flags, stack, memory-mapped I/O, and assembler directives.
+- Added binary `.bin` machine-code output alongside the human-readable `.mc` format.
+- Added `MOV`, `PUSH`, and `POP` instructions.
+- Added assembler constants, `.text` / `.data` sections, `.org`, `.byte`, `.word`, and `.ascii` support.
 
 ## Priority 0: Fix Correctness First
 
@@ -136,9 +140,9 @@ Suggested fix:
 - Add comments explaining expected final register/memory state.
 - Add one small example per CPU concept.
 
-### 8. Define the architecture in Markdown
+### 8. Define the architecture in Markdown — started
 
-The repo should contain a clear CPU reference document, for example `docs/architecture.md`, covering:
+The repo now contains `docs/architecture.md`, covering:
 
 - Register file
 - Memory layout
@@ -148,7 +152,11 @@ The repo should contain a clear CPU reference document, for example `docs/archit
 - Memory-mapped I/O
 - Example instruction encodings
 
-This would make the project much better as a learning resource.
+Still to improve:
+
+- Add more diagrams.
+- Add more annotated examples that reference the architecture document.
+- Add a binary encoding walkthrough with a full program.
 
 ### 9. Rework Jutcode into a real CLI tool
 
@@ -196,11 +204,11 @@ Done:
 - `computesimple.py` has been replaced by `cpu.py`.
 - The README shows both headless and graphical run options.
 
-Next milestone: **Architecture documentation and cleaner examples**
+Next milestone: **Cleaner examples and instruction encoding polish**
 
 Definition of done:
 
-- Add `docs/architecture.md`.
 - Add one small example program per CPU concept.
-- Add expected final state comments to examples.
-- Add tests for the important example programs.
+- Add expected final state comments to every example.
+- Add tests for each example program's final state.
+- Decide whether to keep the current 4-byte-per-instruction binary format or move toward a denser encoding later.

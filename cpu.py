@@ -14,6 +14,35 @@ from typing import Iterable
 
 Instruction = tuple[int, int | None, int | None, int | None]
 Program = list[Instruction]
+MemoryImage = dict[int, int]
+
+
+# Base 4-bit opcodes kept compatible with the original project.
+OP_NOP = 0x00
+OP_HLT = 0x01
+OP_ADD = 0x02
+OP_SUB = 0x03
+OP_NOR = 0x04
+OP_AND = 0x05
+OP_XOR = 0x06
+OP_RSH = 0x07
+OP_LDI = 0x08
+OP_ADI = 0x09
+OP_JMP = 0x0A
+OP_BRH = 0x0B
+OP_CAL = 0x0C
+OP_RET = 0x0D
+OP_LOD = 0x0E
+OP_STR = 0x0F
+
+# Extended opcodes. These require the 32-bit binary instruction encoding, but
+# also work in the human-readable `.mc` tuple format.
+OP_MOV = 0x10
+OP_PUSH = 0x11
+OP_POP = 0x12
+
+NONE_BYTE = 0xFF
+INSTRUCTION_SIZE_BYTES = 4
 
 
 class CPUFault(RuntimeError):
@@ -54,9 +83,9 @@ class CPU:
     CPU state:
     - 16 general-purpose 8-bit registers: R0-R15
     - 256 bytes of RAM
-    - program counter (`pc`)
+    - program counter (`pc`) pointing at an instruction index
     - zero and carry/borrow flags (`Z`, `C`)
-    - a small call stack for CAL/RET
+    - a RAM-backed downward-growing stack
 
     Branch condition codes:
     - 0: Z  - zero flag set
@@ -67,7 +96,7 @@ class CPU:
 
     MEMORY_SIZE = 256
     REGISTER_COUNT = 16
-    STACK_LIMIT = 16
+    STACK_START = 239  # Keep 240-255 available for memory-mapped I/O.
 
     COND_Z = 0
     COND_C = 1
@@ -78,22 +107,44 @@ class CPU:
         self.screen = screen if screen is not None else NullScreen()
         self.registers = [0] * self.REGISTER_COUNT
         self.memory = [0] * self.MEMORY_SIZE
-        self.stack: list[int] = []
         self.pc = 0
+        self.sp = self.STACK_START
         self.flags = {"Z": 0, "C": 0}
         self.number_display = 0
         self.signed_mode = False
         self.halted = False
 
+    @property
+    def stack_depth(self) -> int:
+        return self.STACK_START - self.sp
+
+    @property
+    def stack(self) -> list[int]:
+        """Debug view of the RAM-backed stack, top first.
+
+        Kept as a property so older tests/tools can still inspect `cpu.stack`
+        without the emulator using a Python list for actual call behavior.
+        """
+
+        return [self.memory[address] for address in range(self.sp + 1, self.STACK_START + 1)]
+
     def reset(self) -> None:
         self.registers = [0] * self.REGISTER_COUNT
         self.memory = [0] * self.MEMORY_SIZE
-        self.stack = []
         self.pc = 0
+        self.sp = self.STACK_START
         self.flags = {"Z": 0, "C": 0}
         self.number_display = 0
         self.signed_mode = False
         self.halted = False
+
+    def load_memory_image(self, memory_image: MemoryImage) -> None:
+        for address, value in memory_image.items():
+            if not 0 <= address < self.MEMORY_SIZE:
+                raise CPUFault(f"Memory image address out of range: {address}")
+            if not 0 <= value <= 0xFF:
+                raise CPUFault(f"Memory image value out of range at {address}: {value}")
+            self.memory[address] = value
 
     def execute(self, opcode: int, operand1: int | None = None, operand2: int | None = None, operand3: int | None = None) -> int | None:
         """Execute one decoded instruction.
@@ -102,15 +153,15 @@ class CPU:
         caller should advance to the next instruction.
         """
 
-        if opcode == 0b0000:  # NOP
+        if opcode == OP_NOP:
             return None
 
-        if opcode == 0b0001:  # HLT
+        if opcode == OP_HLT:
             self.screen.display_light()
             self.halted = True
             return None
 
-        if opcode == 0b0010:  # ADD dest, left, right
+        if opcode == OP_ADD:  # ADD dest, left, right
             dest = self._require_register(operand1, "ADD destination")
             left = self._read_register(operand2, "ADD left operand")
             right = self._read_register(operand3, "ADD right operand")
@@ -118,7 +169,7 @@ class CPU:
             self._write_result(dest, result, carry=result > 0xFF)
             return None
 
-        if opcode == 0b0011:  # SUB dest, left, right
+        if opcode == OP_SUB:  # SUB dest, left, right
             dest = self._require_register(operand1, "SUB destination")
             left = self._read_register(operand2, "SUB left operand")
             right = self._read_register(operand3, "SUB right operand")
@@ -126,74 +177,70 @@ class CPU:
             self._write_result(dest, result, carry=result < 0)
             return None
 
-        if opcode == 0b0100:  # NOR dest, left, right
+        if opcode == OP_NOR:  # NOR dest, left, right
             dest = self._require_register(operand1, "NOR destination")
             left = self._read_register(operand2, "NOR left operand")
             right = self._read_register(operand3, "NOR right operand")
             self._write_result(dest, ~(left | right), carry=False)
             return None
 
-        if opcode == 0b0101:  # AND dest, left, right
+        if opcode == OP_AND:  # AND dest, left, right
             dest = self._require_register(operand1, "AND destination")
             left = self._read_register(operand2, "AND left operand")
             right = self._read_register(operand3, "AND right operand")
             self._write_result(dest, left & right, carry=False)
             return None
 
-        if opcode == 0b0110:  # XOR dest, left, right
+        if opcode == OP_XOR:  # XOR dest, left, right
             dest = self._require_register(operand1, "XOR destination")
             left = self._read_register(operand2, "XOR left operand")
             right = self._read_register(operand3, "XOR right operand")
             self._write_result(dest, left ^ right, carry=False)
             return None
 
-        if opcode == 0b0111:  # RSH dest, source
+        if opcode == OP_RSH:  # RSH dest, source
             dest = self._require_register(operand1, "RSH destination")
             source = self._read_register(operand2, "RSH source operand")
             self._write_result(dest, source >> 1, carry=bool(source & 0b1))
             return None
 
-        if opcode == 0b1000:  # LDI dest, immediate
+        if opcode == OP_LDI:  # LDI dest, immediate
             dest = self._require_register(operand1, "LDI destination")
             value = self._require_immediate(operand2, "LDI immediate")
             self._write_result(dest, value, carry=not 0 <= value <= 0xFF)
             return None
 
-        if opcode == 0b1001:  # ADI dest, immediate
+        if opcode == OP_ADI:  # ADI dest, immediate
             dest = self._require_register(operand1, "ADI destination")
             value = self._require_immediate(operand2, "ADI immediate")
             result = self.registers[dest] + value
             self._write_result(dest, result, carry=result > 0xFF or value < 0)
             return None
 
-        if opcode == 0b1010:  # JMP address
+        if opcode == OP_JMP:  # JMP address
             return self._require_address(operand1, "JMP target")
 
-        if opcode == 0b1011:  # BRH condition, address
+        if opcode == OP_BRH:  # BRH condition, address
             condition = self._require_immediate(operand1, "BRH condition")
             target = self._require_address(operand2, "BRH target")
             return target if self.check_condition(condition) else None
 
-        if opcode == 0b1100:  # CAL address
+        if opcode == OP_CAL:  # CAL address
             target = self._require_address(operand1, "CAL target")
-            if len(self.stack) >= self.STACK_LIMIT:
-                raise CPUFault("Stack overflow: cannot call because the stack is full")
-            self.stack.append(self.pc + 1)
+            self._push_byte(self.pc + 1)
             return target
 
-        if opcode == 0b1101:  # RET
-            if not self.stack:
-                raise CPUFault("Stack underflow: RET executed without a matching CAL")
-            return self.stack.pop()
+        if opcode == OP_RET:
+            return self._pop_byte("RET")
 
-        if opcode == 0b1110:  # LOD dest, base_register, offset
+        if opcode == OP_LOD:  # LOD dest, base_register, offset
             dest = self._require_register(operand1, "LOD destination")
             address = self._address_from_register_plus_offset(operand2, operand3, "LOD")
             self.registers[dest] = self.handle_special_load(address)
-            self._set_zero_flag(self.registers[dest])
+            self._write_result(dest, self.registers[dest], carry=False)
             return None
 
-        if opcode == 0b1111:  # STR source, base_register, offset
+        if opcode == OP_STR:  # STR source, base_register, offset
             source = self._require_register(operand1, "STR source")
             address = self._address_from_register_plus_offset(operand2, operand3, "STR")
             value = self.registers[source]
@@ -201,7 +248,23 @@ class CPU:
             self.handle_special_store(address, value)
             return None
 
-        raise CPUFault(f"Unknown opcode: 0b{opcode:04b}")
+        if opcode == OP_MOV:  # MOV dest, source
+            dest = self._require_register(operand1, "MOV destination")
+            value = self._read_register(operand2, "MOV source")
+            self._write_result(dest, value, carry=False)
+            return None
+
+        if opcode == OP_PUSH:  # PUSH source
+            source = self._require_register(operand1, "PUSH source")
+            self._push_byte(self.registers[source])
+            return None
+
+        if opcode == OP_POP:  # POP destination
+            dest = self._require_register(operand1, "POP destination")
+            self._write_result(dest, self._pop_byte("POP"), carry=False)
+            return None
+
+        raise CPUFault(f"Unknown opcode: 0x{opcode:02X}")
 
     def step(self, program: Program) -> bool:
         """Execute one fetch/decode/execute step.
@@ -277,14 +340,23 @@ class CPU:
     def load_program(self, filename: str | Path) -> Program:
         return load_program(filename)
 
+    def _push_byte(self, value: int) -> None:
+        if self.sp < 0:
+            raise CPUFault("Stack overflow: stack pointer moved below RAM address 0")
+        self.memory[self.sp] = value & 0xFF
+        self.sp -= 1
+
+    def _pop_byte(self, instruction: str) -> int:
+        if self.sp >= self.STACK_START:
+            raise CPUFault(f"Stack underflow: {instruction} executed with an empty stack")
+        self.sp += 1
+        return self.memory[self.sp]
+
     def _write_result(self, register: int, result: int, *, carry: bool) -> None:
         value = result & 0xFF
         self.registers[register] = value
         self.flags["Z"] = 1 if value == 0 else 0
         self.flags["C"] = 1 if carry else 0
-
-    def _set_zero_flag(self, result: int) -> None:
-        self.flags["Z"] = 1 if (result & 0xFF) == 0 else 0
 
     def _require_register(self, value: int | None, name: str) -> int:
         if value is None or not 0 <= value < self.REGISTER_COUNT:
@@ -313,7 +385,7 @@ class CPU:
 
     def print_compact_state(self) -> None:
         registers = " ".join(f"R{i}:{value:02X}" for i, value in enumerate(self.registers))
-        print(f"PC:{self.pc:04} Z:{self.flags['Z']} C:{self.flags['C']} {registers}")
+        print(f"PC:{self.pc:04} SP:{self.sp:02X} Z:{self.flags['Z']} C:{self.flags['C']} {registers}")
 
     def print_memory_grid(self) -> None:
         print("RAM (256 bytes):")
@@ -330,11 +402,56 @@ class CPU:
 ALU = CPU
 
 
+def encode_instruction(instruction: Instruction) -> bytes:
+    """Encode one instruction as four bytes: opcode, op1, op2, op3.
+
+    `None` operands are encoded as 0xFF. This is intentionally simple and easy
+    to inspect with a hex editor, while still being real binary machine code.
+    """
+
+    encoded = []
+    for part in instruction:
+        if part is None:
+            encoded.append(NONE_BYTE)
+        elif 0 <= part <= 0xFE:
+            encoded.append(part)
+        else:
+            raise CPUFault(f"Instruction value out of binary encoding range 0-254: {part}")
+    return bytes(encoded)
+
+
+def decode_instruction(data: bytes) -> Instruction:
+    if len(data) != INSTRUCTION_SIZE_BYTES:
+        raise CPUFault(f"Binary instruction must be {INSTRUCTION_SIZE_BYTES} bytes")
+    values = [None if byte == NONE_BYTE else byte for byte in data]
+    opcode = values[0]
+    if opcode is None:
+        raise CPUFault("Binary instruction cannot have an empty opcode")
+    return (opcode, values[1], values[2], values[3])
+
+
+def write_binary_program(filename: str | Path, program: Program) -> None:
+    with open(filename, "wb") as file:
+        for instruction in program:
+            file.write(encode_instruction(instruction))
+
+
+def load_binary_program(filename: str | Path) -> Program:
+    data = Path(filename).read_bytes()
+    if len(data) % INSTRUCTION_SIZE_BYTES != 0:
+        raise CPUFault(f"Binary program size must be a multiple of {INSTRUCTION_SIZE_BYTES} bytes")
+    return [decode_instruction(data[i:i + INSTRUCTION_SIZE_BYTES]) for i in range(0, len(data), INSTRUCTION_SIZE_BYTES)]
+
+
 def load_program(filename: str | Path) -> Program:
-    """Load `.mc` tuple-form machine code from disk."""
+    """Load a machine-code program from `.mc` text tuples or `.bin` bytes."""
+
+    path = Path(filename)
+    if path.suffix == ".bin":
+        return load_binary_program(path)
 
     program: Program = []
-    with open(filename, "r", encoding="utf-8") as file:
+    with open(path, "r", encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             stripped = line.strip()
             if not stripped:
@@ -357,16 +474,48 @@ def load_program(filename: str | Path) -> Program:
     return program
 
 
+def write_memory_image(filename: str | Path, memory_image: MemoryImage) -> None:
+    with open(filename, "w", encoding="utf-8") as file:
+        for address in sorted(memory_image):
+            file.write(f"{address}: {memory_image[address]}\n")
+
+
+def load_memory_image(filename: str | Path) -> MemoryImage:
+    path = Path(filename)
+    if not path.exists():
+        return {}
+    memory_image: MemoryImage = {}
+    with open(path, "r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            stripped = line.split(";", 1)[0].strip()
+            if not stripped:
+                continue
+            if ":" not in stripped:
+                raise CPUFault(f"Invalid memory image syntax on line {line_number}: {line.strip()}")
+            address_text, value_text = stripped.split(":", 1)
+            address = int(address_text.strip(), 0)
+            value = int(value_text.strip(), 0)
+            if not 0 <= address < CPU.MEMORY_SIZE or not 0 <= value <= 0xFF:
+                raise CPUFault(f"Memory image line {line_number} out of range")
+            memory_image[address] = value
+    return memory_image
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Headless 8-bit CPU emulator")
-    parser.add_argument("input_file", help="Machine-code `.mc` file to run")
+    parser.add_argument("input_file", help="Machine-code `.mc` or binary `.bin` file to run")
+    parser.add_argument("--memory", help="Optional memory image file. Defaults to matching .mem if present")
     parser.add_argument("--max-steps", type=int, default=10000, help="Stop after this many instructions to catch infinite loops")
     parser.add_argument("--trace", action="store_true", help="Print CPU state before every instruction")
     parser.add_argument("--dump-memory", action="store_true", help="Print full RAM after execution")
     args = parser.parse_args(argv)
 
+    input_path = Path(args.input_file)
+    memory_path = Path(args.memory) if args.memory else input_path.with_suffix(".mem")
+
     cpu = CPU()
-    program = load_program(args.input_file)
+    cpu.load_memory_image(load_memory_image(memory_path))
+    program = load_program(input_path)
     steps = cpu.run(program, max_steps=args.max_steps, trace=args.trace)
 
     print(f"Executed {steps} instruction(s). Halted: {cpu.halted}. PC: {cpu.pc}")

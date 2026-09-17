@@ -125,33 +125,43 @@ Assemble it with:
 python assemblerasm.py programs/multiplication.asm
 ```
 
-Machine-code output is stored as tuples like:
+The assembler writes two machine-code formats:
+
+- `.mc` — human-readable tuple format for learning/debugging
+- `.bin` — real byte-based machine code using 4 bytes per instruction
+
+Example `.mc` output:
 
 ```text
 (0b1000, 0, 7, None)
 (0b1000, 1, 4, None)
 ```
 
+See [docs/architecture.md](docs/architecture.md) for the full encoding, flags, stack, and memory model.
+
 ## Instruction Set
 
 | Mnemonic | Opcode | Description |
 | --- | --- | --- |
-| `NOP` | `0000` | No operation. |
-| `HLT` | `0001` | Halt execution. |
-| `ADD` | `0010` | Add two registers. |
-| `SUB` | `0011` | Subtract one register from another. |
-| `NOR` | `0100` | Bitwise NOR. |
-| `AND` | `0101` | Bitwise AND. |
-| `XOR` | `0110` | Bitwise XOR. |
-| `RSH` | `0111` | Right-shift a register by one bit. |
-| `LDI` | `1000` | Load an immediate value into a register. |
-| `ADI` | `1001` | Add an immediate value to a register. |
-| `JMP` | `1010` | Jump to an address or label. |
-| `BRH` | `1011` | Branch when a condition is met. Supports `Z`, `C`, `NZ`, and `NC` condition codes in the CPU core. |
-| `CAL` | `1100` | Call a subroutine. |
-| `RET` | `1101` | Return from a subroutine. |
-| `LOD` | `1110` | Load from memory. |
-| `STR` | `1111` | Store to memory. |
+| `NOP` | `0x00` | No operation. |
+| `HLT` | `0x01` | Halt execution. |
+| `ADD` | `0x02` | Add two registers. |
+| `SUB` | `0x03` | Subtract one register from another. |
+| `NOR` | `0x04` | Bitwise NOR. |
+| `AND` | `0x05` | Bitwise AND. |
+| `XOR` | `0x06` | Bitwise XOR. |
+| `RSH` | `0x07` | Right-shift a register by one bit. |
+| `LDI` | `0x08` | Load an immediate value into a register. |
+| `ADI` | `0x09` | Add an immediate value to a register. |
+| `JMP` | `0x0A` | Jump to an address or label. |
+| `BRH` | `0x0B` | Branch when a condition is met. Supports `Z`, `C`, `NZ`, and `NC`. |
+| `CAL` | `0x0C` | Call a subroutine. |
+| `RET` | `0x0D` | Return from a subroutine. |
+| `LOD` | `0x0E` | Load from memory. |
+| `STR` | `0x0F` | Store to memory. |
+| `MOV` | `0x10` | Copy register to register. |
+| `PUSH` | `0x11` | Push register value to the RAM-backed stack. |
+| `POP` | `0x12` | Pop stack value into a register. |
 
 ## CPU Model
 
@@ -160,9 +170,10 @@ The emulator currently models:
 - 16 general-purpose 8-bit registers: `R0` through `R15`
 - 256 bytes of RAM
 - Program counter (`PC`)
+- Stack pointer (`SP`) with a RAM-backed stack
 - Zero and carry flags: `Z`, `C`
-- A small call stack for `CAL` / `RET`
 - Memory-mapped output devices
+- Assembler constants, `.text` / `.data` sections, `.org`, `.byte`, `.word`, and `.ascii`
 
 ## Memory-Mapped I/O
 
@@ -215,6 +226,7 @@ Planned improvements include:
 ├── assemblerjc.py               # Experimental Jutcode compiler prototype
 ├── cpu.py                       # Headless CPU core and CLI runner
 ├── compute.py                   # Graphical emulator with Tkinter display
+├── docs/architecture.md         # CPU architecture reference
 ├── test.py                      # Screen/color buffer experiment
 ├── tests/                       # Unit tests
 ├── programs/                    # Example source and machine-code programs

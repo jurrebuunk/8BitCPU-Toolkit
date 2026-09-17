@@ -1,18 +1,25 @@
+; Draw a horizontal 10-pixel line and halt.
+
+.equ SCREEN_X, 240
+.equ SCREEN_Y, 241
+.equ SCREEN_DRAW, 242
+.equ SCREEN_BUFFER, 245
+
 LDI R0, 10       ; X coordinate
 LDI R1, 15       ; Y coordinate
-LDI R2, 240      ; Address for Pixel X
-LDI R3, 241      ; Address for Pixel Y
-LDI R4, 242      ; Address for Draw Pixel
-LDI R5, 245      ; Address for Buffer Screen
+LDI R6, 0        ; Counter
+LDI R7, 10       ; Number of pixels to draw
+LDI R15, 0       ; Base address for memory-mapped I/O
 
-; Draw first pixel
-STR R1, R3, 0    ; Store Y
+STR R1, R15, SCREEN_Y
 
 LOOP:
-STR R0, R2, 0    ; Store X
-STR R0, R4, 0    ; Draw pixel
-STR R0, R5, 0    ; Buffer screen
-ADI R0, 1        ; Increment X
-JMP LOOP
+    STR R0, R15, SCREEN_X
+    STR R0, R15, SCREEN_DRAW
+    ADI R0, 1
+    ADI R6, 1
+    SUB R8, R6, R7
+    BNZ LOOP
 
-HLT              ; Halt
+STR R0, R15, SCREEN_BUFFER
+HLT

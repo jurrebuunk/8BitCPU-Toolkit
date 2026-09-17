@@ -1,13 +1,18 @@
-LDI R0, 10
-LDI R1, 20
-LDI R2, 0
-L0:
-LDI R6, 0
-SUB R5, R6, R4
-BRH C, R3
-BRH Z, L1
-ADD R2, R2, R6
-LDI R8, 1
-SUB R4, R4, R8
-JMP L0
-L1:
+; Divide 20 by 4 using repeated subtraction.
+; Result: R3 = quotient, R2 = remainder.
+
+LDI R0, 20       ; Dividend
+LDI R1, 4        ; Divisor
+MOV R2, R0       ; Remainder = dividend
+LDI R3, 0        ; Quotient = 0
+
+DIV_LOOP:
+    SUB R4, R2, R1   ; Trial remainder = remainder - divisor
+    BC DIV_END       ; If borrow/carry, remainder < divisor, so stop
+    MOV R2, R4       ; Commit new remainder
+    ADI R3, 1        ; Quotient++
+    JMP DIV_LOOP
+
+DIV_END:
+    STR R3, R15, 250 ; Show quotient
+    HLT
