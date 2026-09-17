@@ -4,20 +4,22 @@ This project is intended as a realistic learning project for understanding how C
 
 ## Current Smoke-Test Results
 
-Tested on 2026-09-17:
+Tested on 2026-09-17 after the first CPU-core cleanup:
 
-- Python syntax check passed for all `.py` files using `python -m py_compile`.
+- Python unit tests pass with `python -m unittest discover -s tests -v`.
+- `computesimple.py` has been renamed to `cpu.py` and now contains the headless, testable CPU core.
+- `cpu.py` can run `.mc` machine-code files without Tkinter.
+- `compute.py` now uses the shared CPU core instead of keeping a duplicate emulator implementation.
+- `ADD`, `SUB`, `BRH Z`, `BRH C`, `CAL`, `RET`, memory-mapped I/O, and machine-code loading have unit tests.
 - All `.asm` programs in `programs/` assemble successfully with `assemblerasm.py`.
-- Re-assembling the example `.asm` files produces the committed `.mc` files unchanged.
-- `assemblerjc.py` runs, but it uses an embedded demo program instead of reading the provided `.jc` file argument.
-- `compute.py` could not run in a headless/no-Tkinter environment because it imports Tkinter directly.
-- `computesimple.py` exits successfully but does not actually execute the loaded program because its internal `run_alu()` function is never called.
+- `programs/multiplication.asm` now starts with main code before the subroutine, avoiding the old stack-underflow behavior.
+- `assemblerjc.py` still uses an embedded demo program instead of reading the provided `.jc` file argument.
 
 ## Priority 0: Fix Correctness First
 
 These issues affect the CPU model itself and should be fixed before adding new instructions or UI features.
 
-### 1. Carry flag behavior is incorrect
+### 1. Carry flag behavior is incorrect — fixed in `cpu.py`
 
 `ADD` and `SUB` detect overflow/underflow, but then `set_flags()` resets the carry flag after the result is masked to 8 bits.
 
@@ -35,13 +37,14 @@ Why this matters:
 - Branching on carry will not work correctly until this is fixed.
 - Arithmetic examples such as division and comparisons depend on this.
 
-Suggested fix:
+Status:
 
-- Calculate flags from the full unmasked result.
-- Store the masked 8-bit result separately.
-- Define whether `C` means carry for addition and borrow for subtraction.
+- Fixed in `cpu.py`.
+- `ADD` sets `C` when the full result is greater than `0xFF`.
+- `SUB` sets `C` when the operation borrows / goes below zero.
+- Tests cover both cases.
 
-### 2. `BRH C` is assembled but not implemented in the emulator
+### 2. `BRH C` is assembled but not implemented in the emulator — fixed in `cpu.py`
 
 The assembler maps non-`Z` branch conditions to condition code `1`, but the emulator only checks condition code `0` / zero flag.
 
@@ -49,27 +52,27 @@ Affected example:
 
 - `programs/div.asm` uses `BRH C`.
 
-Suggested fix:
+Status:
 
-- Define branch condition codes clearly, for example:
+- Fixed in `cpu.py`.
+- Branch condition codes are now:
   - `Z = 0`
   - `C = 1`
-  - optional later: `NZ`, `NC`
-- Implement those conditions in `check_condition()`.
-- Make the assembler reject unknown branch conditions instead of silently mapping them to `C`.
+  - `NZ = 2`
+  - `NC = 3`
+- The assembler now rejects unknown branch conditions.
 
-### 3. Separate the CPU core from the Tkinter UI
+### 3. Separate the CPU core from the Tkinter UI — fixed
 
 Currently `compute.py` creates a Tkinter window inside the `ALU` constructor. This makes the emulator hard to test and impossible to run in environments without Tkinter/display support.
 
-Suggested fix:
+Status:
 
-- Create a pure CPU/emulator module, for example `cpu.py`.
-- Keep registers, memory, instruction execution, flags, and program loading in the pure module.
-- Move Tkinter screen behavior into a separate UI module.
-- Let tests run the CPU without requiring a graphical display.
+- Fixed by creating `cpu.py` as the pure CPU core.
+- `compute.py` is now only the graphical wrapper.
+- Tests run without requiring a graphical display.
 
-### 4. Fix `computesimple.py`
+### 4. Fix `computesimple.py` — fixed by renaming it to `cpu.py`
 
 Current problems:
 
@@ -77,45 +80,51 @@ Current problems:
 - `HLT` references `self.screen`, which does not exist in the simple emulator.
 - Memory-mapped screen methods also assume `self.screen` exists.
 
-Suggested fix:
+Status:
 
-- Either remove `computesimple.py` after the CPU core exists, or turn it into a real headless CLI runner.
-- A useful headless mode should print final registers, flags, memory, and exit cleanly on `HLT`.
+- Fixed by replacing it with `cpu.py`.
+- `python cpu.py programs/multiplication.mc` now runs the machine code headlessly and prints final CPU state.
 
 ## Priority 1: Make the Assembler Easier to Learn With
 
-### 5. Improve parsing and errors
+### 5. Improve parsing and errors — partially fixed
 
-Current limitations:
+Fixed:
 
-- `ADD R1, R2, R3` works, but `ADD R1,R2,R3` fails.
-- Lowercase instructions such as `add R1, R2, R3` fail.
-- Hex immediates such as `0x10` are not supported.
-- Unknown instructions produce raw Python errors like `KeyError`.
+- `ADD R1,R2,R3` now works.
+- Lowercase instructions such as `add r1, r2, r3` now work.
+- Hex and binary immediates such as `0x10` and `0b1010` are now supported.
+- Unknown instructions and branch conditions now produce clearer `ValueError` messages.
 
-Suggested fix:
+Still to improve:
 
-- Add a small tokenizer/parser for assembly lines.
-- Support common numeric formats: decimal, binary, and hex.
-- Give beginner-friendly errors with file name and line number.
-- Decide whether the assembly language should be case-sensitive or case-insensitive.
+- Add stricter operand validation per instruction.
+- Add line/column style diagnostics for more syntax errors.
+- Document whether labels are case-sensitive.
 
-### 6. Add automated tests
+### 6. Add automated tests — started
 
-Start with tests for:
+Current tests cover:
 
 - Assembler output for small programs.
-- ALU arithmetic and flags.
+- CPU arithmetic and flags.
 - Branching and jumps.
 - Calls and returns.
-- Memory load/store.
-- Example programs that should terminate.
+- Memory-mapped I/O.
+- Machine-code loading.
+
+Still to add:
+
+- Tests for `LOD` / `STR` normal RAM behavior.
+- Tests for each example program with expected final state.
+- Tests for invalid machine-code and assembly inputs.
+- Tests for the graphical wrapper where practical.
 
 This is the most important infrastructure improvement because it lets the project grow without breaking CPU behavior.
 
 ## Priority 2: Improve Program Structure and Examples
 
-### 7. Fix example program structure
+### 7. Fix example program structure — started
 
 Some examples are useful but confusing for learners.
 
@@ -170,21 +179,28 @@ Later improvements:
 The project already has a good start: registers, RAM, instructions, branching, calls, flags, and memory-mapped I/O. The most important missing pieces are:
 
 1. A precise architecture specification.
-2. Correct and well-tested flag behavior.
-3. A testable CPU core independent of the GUI.
-4. Clear examples that teach one concept at a time.
-5. Better assembler diagnostics for beginners.
-6. A documented fetch/decode/execute cycle.
-7. Optional later: binary instruction encoding closer to real hardware instead of Python tuple `.mc` files.
+2. Clear examples that teach one concept at a time.
+3. Better assembler diagnostics for beginners.
+4. A documented fetch/decode/execute cycle.
+5. More complete tests around full example programs.
+6. Optional later: binary instruction encoding closer to real hardware instead of Python tuple `.mc` files.
 
 ## Recommended Next Milestone
 
-Milestone: **Reliable Headless CPU Core**
+Milestone: **Reliable Headless CPU Core** — mostly complete
+
+Done:
+
+- `cpu.py` can load and execute `.mc` programs without Tkinter.
+- `ADD`, `SUB`, `BRH Z`, and `BRH C` have tests.
+- `computesimple.py` has been replaced by `cpu.py`.
+- The README shows both headless and graphical run options.
+
+Next milestone: **Architecture documentation and cleaner examples**
 
 Definition of done:
 
-- `cpu.py` can load and execute `.mc` programs without Tkinter.
-- `ADD`, `SUB`, `BRH Z`, and `BRH C` have correct tests.
-- `programs/test.asm` assembles and runs in tests.
-- `computesimple.py` is either fixed as a headless runner or removed.
-- The README shows both headless and graphical run options.
+- Add `docs/architecture.md`.
+- Add one small example program per CPU concept.
+- Add expected final state comments to examples.
+- Add tests for the important example programs.

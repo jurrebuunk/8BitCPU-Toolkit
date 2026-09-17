@@ -27,80 +27,133 @@ register_map = {
     'R12': 12, 'R13': 13, 'R14': 14, 'R15': 15,
 }
 
+condition_map = {
+    'Z': 0,
+    'C': 1,
+    'NZ': 2,
+    'NC': 3,
+}
+
+
+def strip_comment(line):
+    return line.split(';', 1)[0].strip()
+
+
+def split_instruction(line):
+    return line.replace(',', ' ').split()
+
+
+def parse_number(value):
+    try:
+        return int(value, 0)
+    except ValueError as exc:
+        raise ValueError(f"Expected number, got '{value}'") from exc
+
+
+def parse_register_or_number(value):
+    upper_value = value.upper()
+    if upper_value in register_map:
+        return register_map[upper_value]
+    return parse_number(value)
+
+
+def parse_target(value, labels):
+    if value in labels:
+        return labels[value]
+    upper_value = value.upper()
+    if upper_value in register_map:
+        return register_map[upper_value]
+    return parse_number(value)
+
+
+def collect_labels(lines):
+    labels = {}
+    pc = 0
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = strip_comment(raw_line)
+        if not line:
+            continue
+        if ':' in line:
+            label, line = line.split(':', 1)
+            label = label.strip()
+            if not label:
+                raise ValueError(f"Line {line_number}: empty label")
+            if label in labels:
+                raise ValueError(f"Line {line_number}: duplicate label '{label}'")
+            labels[label] = pc
+            line = line.strip()
+        if line:
+            pc += 1
+    return labels
+
 
 def assemble(assembly_code):
     lines = assembly_code.strip().split('\n')
     machine_code = []
-    labels = {}
-    pc = 0
+    labels = collect_labels(lines)
 
-    # First pass: handle labels
-    for line in lines:
-        line = line.split(';')[0].strip()  # Remove comments
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = strip_comment(raw_line)
+        if not line:
+            continue
         if ':' in line:
-            label, instruction = line.split(':')
-            labels[label.strip()] = pc
-            line = instruction.strip()
-        if line:
-            pc += 1
-
-    # Second pass: generate machine code
-    pc = 0  # Reset program counter for the second pass
-    for line in lines:
-        line = line.split(';')[0].strip()  # Remove comments
-        if ':' in line:
-            _, line = line.split(':')
-        line = line.strip()
+            _, line = line.split(':', 1)
+            line = line.strip()
         if not line:
             continue
 
-        parts = line.split()
-        opcode = opcode_map[parts[0]]
-        operands = [op.strip(',') for op in parts[1:]]  # Remove commas
+        parts = split_instruction(line)
+        mnemonic = parts[0].upper()
+        if mnemonic not in opcode_map:
+            raise ValueError(f"Line {line_number}: unknown instruction '{parts[0]}'")
+        opcode = opcode_map[mnemonic]
+        operands = parts[1:]
 
-        if parts[0] == 'BRH':
-            cond = 0 if operands[0] == 'Z' else 1  # Example condition mapping
-            if operands[1] in labels:
-                address = labels[operands[1]]
-                machine_code.append((opcode, cond, address, None))
+        try:
+            if mnemonic == 'BRH':
+                if len(operands) != 2:
+                    raise ValueError("BRH expects: BRH <condition>, <target>")
+                condition = operands[0].upper()
+                if condition not in condition_map:
+                    known = ', '.join(condition_map)
+                    raise ValueError(f"Unknown branch condition '{operands[0]}'. Expected one of: {known}")
+                target = parse_target(operands[1], labels)
+                machine_code.append((opcode, condition_map[condition], target, None))
+            elif mnemonic in ('JMP', 'CAL'):
+                if len(operands) != 1:
+                    raise ValueError(f"{mnemonic} expects exactly one target")
+                target = parse_target(operands[0], labels)
+                machine_code.append((opcode, target, None, None))
+            elif mnemonic == 'RET' or mnemonic == 'HLT' or mnemonic == 'NOP':
+                if operands:
+                    raise ValueError(f"{mnemonic} does not take operands")
+                machine_code.append((opcode, None, None, None))
             else:
-                reg = register_map[operands[1]]
-                machine_code.append((opcode, cond, reg, None))
-        elif parts[0] == 'JMP':
-            if operands[0] in labels:
-                address = labels[operands[0]]
-            else:
-                address = int(operands[0])
-            machine_code.append((opcode, address, None, None))
-        elif parts[0] == 'CAL':
-            if operands[0] in labels:
-                address = labels[operands[0]]
-            else:
-                address = int(operands[0])
-            machine_code.append((opcode, address, None, None))
-        elif parts[0] == 'RET':
-            machine_code.append((opcode, None, None, None))
-        else:
-            ops = [register_map[op] if op in register_map else int(op) for op in operands]
-            while len(ops) < 3:
-                ops.append(None)
-            machine_code.append((opcode, *ops))
-        
-        pc += 1  # Increment program counter for each instruction
+                ops = [parse_register_or_number(op) for op in operands]
+                while len(ops) < 3:
+                    ops.append(None)
+                if len(ops) > 3:
+                    raise ValueError(f"{mnemonic} expects at most three operands")
+                machine_code.append((opcode, *ops))
+        except ValueError as exc:
+            raise ValueError(f"Line {line_number}: {exc}") from exc
 
     return machine_code
+
 
 def read_assembly_file(input_file):
     with open(input_file, 'r') as file:
         return file.read()
 
+
 def write_machine_code_file(output_file, machine_code):
     with open(output_file, 'w') as file:
         for instruction in machine_code:
             opcode, *operands = instruction
-            opcode_str = f"0b{opcode:04b}"  # Ensure 4-bit binary representation with 0b prefix
+            opcode_str = f"0b{opcode:04b}"
             operands_str = ', '.join(str(op) if op is not None else 'None' for op in operands)
             file.write(f"({opcode_str}, {operands_str})\n")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Assemble assembly code into machine code.')
@@ -116,6 +169,6 @@ def main():
 
     print(f"Assembly code from {input_file} has been assembled and written to {output_file}.")
 
+
 if __name__ == '__main__':
     main()
-

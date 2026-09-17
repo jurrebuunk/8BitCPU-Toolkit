@@ -31,6 +31,29 @@ Project website: [jurrebuunk.github.io/8BitCPU-Toolkit](https://jurrebuunk.githu
 
 No third-party Python packages are currently required.
 
+## Development Environment
+
+If you use Nix, enter a shell with Python + Tkinter available:
+
+```bash
+nix develop
+```
+
+Or with classic `nix-shell`:
+
+```bash
+nix-shell
+```
+
+Useful manual testing commands:
+
+```bash
+make test
+make assemble-examples
+make run-multiplication
+make gui-multiplication
+```
+
 ## Quick Start
 
 ```bash
@@ -50,13 +73,19 @@ This writes the generated machine code to:
 programs/multiplication.mc
 ```
 
-Run the generated machine code in the graphical emulator:
+Run the generated machine code in the headless CPU runner:
+
+```bash
+python cpu.py programs/multiplication.mc
+```
+
+Run the same program in the graphical Tkinter emulator:
 
 ```bash
 python compute.py programs/multiplication.mc
 ```
 
-Run with step-by-step debugging:
+Run the graphical emulator with step-by-step debugging:
 
 ```bash
 python compute.py programs/multiplication.mc --step
@@ -74,9 +103,10 @@ python compute.py programs/multiplication.mc --clock 2
 | --- | --- |
 | `assemblerasm.py` | Assembles `.asm` source files into `.mc` machine-code files. |
 | `assemblerjc.py` | Experimental Jutcode lexer/parser/code generator prototype. |
-| `compute.py` | Main CPU emulator with Tkinter display, clock controls, register/RAM output, and step mode. |
-| `computesimple.py` | Smaller/simple emulator prototype. |
+| `cpu.py` | Reliable headless CPU core and command-line runner. |
+| `compute.py` | Graphical emulator using the shared CPU core with Tkinter display, clock controls, and step mode. |
 | `test.py` | Tkinter color screen/buffer experiment. |
+| `tests/` | Unit tests for the assembler and CPU core. |
 | `programs/` | Example `.asm`, `.mc`, and `.jc` programs. |
 
 ## Assembly Example
@@ -117,7 +147,7 @@ Machine-code output is stored as tuples like:
 | `LDI` | `1000` | Load an immediate value into a register. |
 | `ADI` | `1001` | Add an immediate value to a register. |
 | `JMP` | `1010` | Jump to an address or label. |
-| `BRH` | `1011` | Branch when a condition is met. `Z` is currently implemented in the emulator. |
+| `BRH` | `1011` | Branch when a condition is met. Supports `Z`, `C`, `NZ`, and `NC` condition codes in the CPU core. |
 | `CAL` | `1100` | Call a subroutine. |
 | `RET` | `1101` | Return from a subroutine. |
 | `LOD` | `1110` | Load from memory. |
@@ -183,9 +213,10 @@ Planned improvements include:
 .
 ├── assemblerasm.py              # Assembly assembler
 ├── assemblerjc.py               # Experimental Jutcode compiler prototype
-├── compute.py                   # Main emulator with Tkinter display
-├── computesimple.py             # Simple emulator prototype
+├── cpu.py                       # Headless CPU core and CLI runner
+├── compute.py                   # Graphical emulator with Tkinter display
 ├── test.py                      # Screen/color buffer experiment
+├── tests/                       # Unit tests
 ├── programs/                    # Example source and machine-code programs
 ├── Jutcode documentation.docx   # Jutcode notes/documentation
 ├── CHANGELOG.md                 # Release history
@@ -197,13 +228,19 @@ Planned improvements include:
 
 - This is an alpha release, so behavior may change.
 - The Jutcode compiler is experimental and not yet a full file-based CLI tool.
-- `BRH Z` is implemented in the emulator; other branch conditions are still being developed.
+- Some older example programs still need cleanup and clearer expected-output comments.
 - The graphical emulator requires a working Tkinter display environment.
 - There is no packaged `pip` install flow yet.
 
+## Running Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Roadmap
 
-- Add automated tests for the assembler and emulator.
+- Expand automated tests for more example programs and edge cases.
 - Turn the tools into cleaner command-line interfaces.
 - Add packaging via `pyproject.toml`.
 - Improve Jutcode file input/output.

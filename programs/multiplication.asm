@@ -1,19 +1,22 @@
+; Multiply R0 by R1 using repeated addition.
+; Result: R2 = R0 * R1.
+
+LDI R0, 7          ; Multiplicand
+LDI R1, 4          ; Multiplier
+CAL MULTIPLY       ; Call multiplication subroutine
+STR R2, R15, 250   ; Show the result on the number display
+HLT                ; Halt the program
+
 MULTIPLY:
-    LDI R2, 0       ; 1000: Initialize result to 0
-    LDI R3, 0       ; 1000: Initialize counter to 0
+    LDI R2, 0       ; Initialize result to 0
+    LDI R3, 0       ; Initialize counter to 0
 
 MULT_LOOP:
-    SUB R4, R1, R3  ; 0011: R4 = R1 - R3 (check if counter < multiplier)
-    BRH Z, MULT_END ; 1011: If zero flag is set, jump to MULT_END
-    ADD R2, R2, R0  ; 0010: R2 = R2 + R0 (add multiplicand to result)
-    ADI R3, 1       ; 1001: Increment counter
-    JMP MULT_LOOP   ; 1010: Repeat loop
+    SUB R4, R1, R3  ; R4 = multiplier - counter
+    BRH Z, MULT_END ; If zero flag is set, jump to MULT_END
+    ADD R2, R2, R0  ; R2 = R2 + multiplicand
+    ADI R3, 1       ; Increment counter
+    JMP MULT_LOOP   ; Repeat loop
 
 MULT_END:
-    RET             ; 1101: Return from function
-
-LDI R0, 7          ; 1000: Load multiplicand (8) into R0
-LDI R1, 4          ; 1000: Load multiplier (4) into R1
-CAL MULTIPLY       ; 1100: Call MULTIPLY function
-STR R2, R15, 250   ; 1111: Store the result in memory at address R3 + 0
-HLT                ; 0001: Halt the program
+    RET             ; Return from subroutine
