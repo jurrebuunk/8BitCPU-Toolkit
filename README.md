@@ -9,6 +9,8 @@
 Project website: [jurrebuunk.github.io/8BitCPU-Toolkit](https://jurrebuunk.github.io/8BitCPU-Toolkit/)
 
 > Status: **alpha / pre-release**. The toolkit is usable for experimentation, but the CLI, instruction behavior, and Jutcode compiler are still evolving.
+>
+> See [ROADMAP.md](ROADMAP.md) for the current test findings, limitations, and recommended next fixes.
 
 ## Features
 
